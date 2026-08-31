@@ -136,3 +136,91 @@ function renderResult(result) {
   resultsEl.hidden = false;
   resultsEl.scrollIntoView({ behavior: "smooth" });
 }
+
+// --- Settings panel -------------------------------------------------------
+const btnSettings = document.getElementById("btn-settings");
+const settingsEl = document.getElementById("settings");
+const settingsForm = document.getElementById("settings-form");
+const settingsStatus = document.getElementById("settings-status");
+const cfg = {
+  apikey: document.getElementById("cfg-apikey"),
+  apikeyHint: document.getElementById("apikey-hint"),
+  broker: document.getElementById("cfg-broker"),
+  port: document.getElementById("cfg-port"),
+  topic: document.getElementById("cfg-topic"),
+  user: document.getElementById("cfg-user"),
+  pass: document.getElementById("cfg-pass"),
+  passHint: document.getElementById("pass-hint"),
+  qos: document.getElementById("cfg-qos"),
+};
+
+function setSettingsStatus(text, isError = false) {
+  settingsStatus.hidden = !text;
+  settingsStatus.textContent = text || "";
+  settingsStatus.classList.toggle("error", isError);
+}
+
+function fillSettings(c) {
+  cfg.broker.value = c.mqtt_broker || "";
+  cfg.port.value = c.mqtt_port || "1883";
+  cfg.topic.value = c.mqtt_topic || "satori/answers";
+  cfg.user.value = c.mqtt_user || "";
+  cfg.qos.value = c.mqtt_qos || "0";
+  cfg.apikey.value = "";
+  cfg.pass.value = "";
+  cfg.apikeyHint.textContent = c.anthropic_api_key_set
+    ? "A key is already set — leave blank to keep it."
+    : "No key set yet.";
+  cfg.passHint.textContent = c.mqtt_password_set
+    ? "A password is already set — leave blank to keep it."
+    : "Leave blank for an anonymous broker.";
+}
+
+btnSettings.addEventListener("click", async () => {
+  const opening = settingsEl.hidden;
+  settingsEl.hidden = !opening;
+  if (!opening) return;
+  setSettingsStatus("");
+  try {
+    const resp = await fetch("/api/config");
+    fillSettings(await resp.json());
+    settingsEl.scrollIntoView({ behavior: "smooth" });
+  } catch (err) {
+    setSettingsStatus(`Could not load settings: ${err.message}`, true);
+  }
+});
+
+settingsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  // MQTT (non-secret) fields are always sent; secrets only when typed.
+  const body = {
+    mqtt_broker: cfg.broker.value.trim(),
+    mqtt_port: cfg.port.value.trim() || "1883",
+    mqtt_topic: cfg.topic.value.trim() || "satori/answers",
+    mqtt_user: cfg.user.value.trim(),
+    mqtt_qos: cfg.qos.value,
+  };
+  if (cfg.apikey.value.trim()) body.anthropic_api_key = cfg.apikey.value.trim();
+  if (cfg.pass.value) body.mqtt_password = cfg.pass.value;
+
+  setSettingsStatus("Saving…");
+  try {
+    const resp = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const b = await resp.json().catch(() => ({}));
+      throw new Error(b.detail || `Error ${resp.status}`);
+    }
+    const data = await resp.json();
+    fillSettings(data.config);
+    const bits = [];
+    if (data.applied.anthropic) bits.push("API key");
+    if (data.applied.mqtt) bits.push("MQTT");
+    setSettingsStatus(bits.length ? `Saved and applied: ${bits.join(", ")}.` : "Saved.");
+  } catch (err) {
+    setSettingsStatus(`Error: ${err.message}`, true);
+  }
+});

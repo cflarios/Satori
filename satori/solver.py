@@ -67,8 +67,20 @@ class QuizSolverError(RuntimeError):
 
 class QuizSolver:
     def __init__(self, client: Optional[anthropic.Anthropic] = None, model: str = MODEL):
-        self.client = client or anthropic.Anthropic()
+        self._client = client
         self.model = model
+
+    @property
+    def client(self) -> anthropic.Anthropic:
+        # Built lazily so the app can start without a key and have one configured
+        # later (e.g. from the web Settings panel), and so a key change at runtime
+        # takes effect by simply rebuilding the solver.
+        if self._client is None:
+            try:
+                self._client = anthropic.Anthropic()
+            except anthropic.AnthropicError as exc:
+                raise QuizSolverError(f"No API key configured: {exc}")
+        return self._client
 
     def solve(
         self,
