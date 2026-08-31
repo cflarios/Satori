@@ -56,9 +56,14 @@ python app.py --file photo.jpg   # test with an image, no camera
 In the preview window:
 
 - **SPACE** — capture the current frame and send it to Claude
+- **A** — toggle auto-capture (on by default)
+- **S** — open the settings dialog (API key + MQTT)
 - **Q / ESC** — quit
-- The **sharpness** indicator turns green when the image is in focus; capture when
-  it is green and the quiz fills the frame.
+- The **sharpness** indicator turns green when the image is in focus.
+
+**Auto-capture** (no key needed): when the image is sharp and holds still for ~1s,
+it captures on its own. It re-arms after the scene clearly moves, so the same page
+isn't captured twice — put a quiz in view, hold steady, move it away, put the next.
 
 Answers are printed to the console and saved (along with the capture) in `captures/`.
 
@@ -85,6 +90,29 @@ It is published with `retain=True`, so a client (e.g. an ESP32) receives the las
 answer as soon as it connects. Use the PC's local-network IP as the broker (not
 `127.0.0.1`, which an ESP32 could not reach). Without `MQTT_BROKER`, everything runs
 the same without publishing anything.
+
+### Remote capture trigger
+
+The **desktop app** also *subscribes* to a command topic and captures the current
+frame whenever a message lands on it — so any external device (a hardware button, a
+phone, a script) can trigger a scan over the network. The interface is intentionally
+minimal:
+
+- **Broker**: the same one set in `MQTT_BROKER` (e.g. the ESP32 broker at
+  `192.168.1.21:1883`).
+- **Topic**: `satori/capture` (override with `MQTT_CAPTURE_TOPIC`).
+- **Payload**: ignored — *any* message triggers one capture.
+
+Any MQTT publisher works. From a PC:
+
+```bash
+mosquitto_pub -h 192.168.1.21 -t satori/capture -m go
+```
+
+From separate button hardware (any MCU with an MQTT client): connect to the same
+broker and publish an empty/any message to `satori/capture` on button press. That is
+the whole contract — the app handles the rest. (The web frontend does not yet react
+to this topic; it captures in the browser.)
 
 ## Technical notes
 
