@@ -137,9 +137,11 @@ function renderResult(result) {
   resultsEl.scrollIntoView({ behavior: "smooth" });
 }
 
-// --- Settings panel -------------------------------------------------------
+// --- Settings sidebar -----------------------------------------------------
 const btnSettings = document.getElementById("btn-settings");
+const btnSettingsClose = document.getElementById("btn-settings-close");
 const settingsEl = document.getElementById("settings");
+const settingsBackdrop = document.getElementById("settings-backdrop");
 const settingsForm = document.getElementById("settings-form");
 const settingsStatus = document.getElementById("settings-status");
 const cfg = {
@@ -176,18 +178,33 @@ function fillSettings(c) {
     : "Leave blank for an anonymous broker.";
 }
 
-btnSettings.addEventListener("click", async () => {
-  const opening = settingsEl.hidden;
-  settingsEl.hidden = !opening;
-  if (!opening) return;
+function closeSettings() {
+  settingsEl.classList.remove("open");
+  settingsEl.setAttribute("aria-hidden", "true");
+  settingsBackdrop.hidden = true;
+}
+
+async function openSettings() {
+  settingsEl.classList.add("open");
+  settingsEl.setAttribute("aria-hidden", "false");
+  settingsBackdrop.hidden = false;
   setSettingsStatus("");
   try {
     const resp = await fetch("/api/config");
     fillSettings(await resp.json());
-    settingsEl.scrollIntoView({ behavior: "smooth" });
   } catch (err) {
     setSettingsStatus(`Could not load settings: ${err.message}`, true);
   }
+}
+
+btnSettings.addEventListener("click", () => {
+  if (settingsEl.classList.contains("open")) closeSettings();
+  else openSettings();
+});
+btnSettingsClose.addEventListener("click", closeSettings);
+settingsBackdrop.addEventListener("click", closeSettings);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && settingsEl.classList.contains("open")) closeSettings();
 });
 
 settingsForm.addEventListener("submit", async (e) => {

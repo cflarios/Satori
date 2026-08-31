@@ -37,14 +37,36 @@ header p { margin: 8px 0 20px; color: var(--muted); }
 }
 .icon-btn:hover:not(:disabled) { background: #eceff3; color: var(--text); }
 
-.settings-panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 18px;
-  margin-bottom: 20px;
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 40;
 }
-.settings-panel h2 { margin: 0 0 12px; font-size: 1.15rem; }
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(380px, 92vw);
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.14);
+  padding: 18px 18px 40px;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
+  z-index: 50;
+}
+.settings-panel.open { transform: translateX(0); }
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.settings-head h2 { margin: 0; font-size: 1.15rem; }
 .settings-panel fieldset {
   border: 1px solid var(--border);
   border-radius: 10px;

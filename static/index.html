@@ -24,8 +24,17 @@
       <p>Point the camera at the quiz and capture — Claude solves it.</p>
     </header>
 
-    <section id="settings" class="settings-panel" hidden>
-      <h2>Settings</h2>
+    <div id="settings-backdrop" class="settings-backdrop" hidden></div>
+    <aside id="settings" class="settings-panel" aria-hidden="true">
+      <div class="settings-head">
+        <h2>Settings</h2>
+        <button id="btn-settings-close" class="icon-btn" type="button" aria-label="Close settings" title="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+      </div>
       <form id="settings-form" autocomplete="off">
         <fieldset>
           <legend>Model</legend>
@@ -55,7 +64,7 @@
           <span id="settings-status" class="status" hidden></span>
         </div>
       </form>
-    </section>
+    </aside>
 
     <section class="camera-panel">
       <div class="video-wrap">
