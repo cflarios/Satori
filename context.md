@@ -43,7 +43,9 @@ camera/browser ──image──> QuizSolver.solve() ──> Claude (vision, JSO
 - **`satori/publisher.py`** — optional MQTT publisher (`paho-mqtt`). `from_env()`
   returns `None` when `MQTT_BROKER` is unset, so MQTT is fully optional.
 - **`app.py`** — desktop UI loop; analysis runs on a worker thread so the video
-  doesn't freeze; saves capture + answers JSON to `captures/`.
+  doesn't freeze; saves capture + answers JSON to `captures/`. Triggers: SPACE
+  (manual), auto-capture on stability (`A` toggles it), and a remote MQTT command
+  on `satori/capture`. Press `S` for the settings dialog.
 - **`server.py`** — FastAPI: `POST /api/solve` (multipart image) runs the solver in
   a threadpool; static files served at `/`. MQTT connect/disconnect via `lifespan`.
 - **`static/`** — `index.html`, `app.js`, `style.css`, `logo.svg` (favicon + header).

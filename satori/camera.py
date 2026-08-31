@@ -17,6 +17,12 @@ MAX_LONG_EDGE = 1568
 # Empirical value for printed text at ~1080p; adjust if your camera differs.
 SHARPNESS_THRESHOLD = 60.0
 
+# Auto-capture tuning (mean per-pixel frame difference, 0..255 on a small gray).
+# Below STABILITY = the scene is holding still; above MOTION = it clearly moved
+# (used to re-arm for the next document). Adjust if your lighting is noisy.
+STABILITY_THRESHOLD = 2.5
+MOTION_THRESHOLD = 6.0
+
 
 class Camera:
     def __init__(self, index: int = 0, width: int = 1920, height: int = 1080):
@@ -43,6 +49,18 @@ def sharpness(frame: np.ndarray) -> float:
     # Downscaling before measuring keeps the metric stable and cheap per frame.
     small = cv2.resize(gray, (0, 0), fx=0.5, fy=0.5)
     return float(cv2.Laplacian(small, cv2.CV_64F).var())
+
+
+def small_gray(frame: np.ndarray, width: int = 160) -> np.ndarray:
+    """Tiny grayscale version of the frame, for cheap frame-to-frame comparison."""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape[:2]
+    return cv2.resize(gray, (width, max(1, round(h * width / w))), interpolation=cv2.INTER_AREA)
+
+
+def frame_change(prev_small: np.ndarray, cur_small: np.ndarray) -> float:
+    """Mean absolute difference between two small_gray frames (0..255)."""
+    return float(cv2.absdiff(prev_small, cur_small).mean())
 
 
 def encode_jpeg(frame: np.ndarray, quality: int = 92) -> bytes:

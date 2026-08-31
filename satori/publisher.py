@@ -18,6 +18,7 @@ Compact (JSON) payload intended for ArduinoJson on the ESP32:
 import json
 import os
 import time
+import uuid
 from typing import Optional
 
 import paho.mqtt.client as mqtt
@@ -44,14 +45,21 @@ class MqttPublisher:
         # even if it missed the live message.
         self.retain = retain
 
+        # Unique per instance so the desktop and web apps can talk to the same
+        # broker at once without evicting each other (MQTT bars duplicate ids).
         self.client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id="satori-publisher",
+            client_id=f"satori-{uuid.uuid4().hex[:8]}",
         )
         if username:
             self.client.username_pw_set(username, password)
         # Retry the connection in the background; never blocks the analysis.
         self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+
+        # topic -> callback(topic, payload). Re-subscribed on every (re)connect.
+        self._subs = {}
+        self.client.on_connect = self._on_connect
+        self.client.on_message = self._on_message
 
     @classmethod
     def from_env(cls) -> Optional["MqttPublisher"]:
@@ -67,6 +75,27 @@ class MqttPublisher:
             password=os.environ.get("MQTT_PASSWORD") or None,
             qos=int(os.environ.get("MQTT_QOS", "1")),
         )
+
+    def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        # (Re)subscribe on connect so subscriptions survive reconnects.
+        for topic in self._subs:
+            client.subscribe(topic, qos=self.qos)
+
+    def _on_message(self, client, userdata, msg):
+        cb = self._subs.get(msg.topic)
+        if cb is None and self._subs:
+            cb = next(iter(self._subs.values()))  # single-topic fallback
+        if cb:
+            try:
+                cb(msg.topic, msg.payload)
+            except Exception as exc:  # noqa: BLE001 - a bad handler must not kill the loop
+                print(f"MQTT: command handler error ({exc}).")
+
+    def subscribe(self, topic: str, callback) -> None:
+        """Call `callback(topic, payload_bytes)` on every message to `topic`."""
+        self._subs[topic] = callback
+        if self.client.is_connected():
+            self.client.subscribe(topic, qos=self.qos)
 
     def connect(self) -> None:
         self.client.connect(self.broker, self.port, keepalive=60)
