@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Satori — quizzes</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand">
+        <img src="logo.svg" alt="" class="logo" width="48" height="48">
+        <h1>Satori</h1>
+      </div>
+      <p>Point the camera at the quiz and capture — Claude solves it.</p>
+    </header>
+
+    <section class="camera-panel">
+      <div class="video-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <div id="camera-off" class="camera-off">Camera off</div>
+      </div>
+      <div class="controls">
+        <button id="btn-camera" type="button">Turn on camera</button>
+        <button id="btn-capture" type="button" disabled>Capture and solve</button>
+        <label class="upload-label">
+          or upload a photo
+          <input id="file-input" type="file" accept="image/*">
+        </label>
+      </div>
+      <p id="status" class="status" hidden></p>
+    </section>
+
+    <section id="results" class="results" hidden>
+      <h2>Answers</h2>
+      <div id="warnings"></div>
+      <div id="answers"></div>
+    </section>
+  </main>
+  <canvas id="canvas" hidden></canvas>
+  <script src="app.js"></script>
+</body>
+</html>

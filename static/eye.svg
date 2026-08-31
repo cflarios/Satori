@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Eye — Satori">
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f1dfe9"/>
+      <stop offset="0.4" stop-color="#dcd3ea"/>
+      <stop offset="0.72" stop-color="#c4d2ef"/>
+      <stop offset="1" stop-color="#e9eef9"/>
+    </linearGradient>
+    <radialGradient id="sclera" cx="0.42" cy="0.58" r="0.72">
+      <stop offset="0" stop-color="#fbfcff"/>
+      <stop offset="0.62" stop-color="#efeaf3"/>
+      <stop offset="1" stop-color="#dcc4d4"/>
+    </radialGradient>
+    <radialGradient id="iris" cx="0.5" cy="0.74" r="0.64">
+      <stop offset="0" stop-color="#9df4ff"/>
+      <stop offset="0.32" stop-color="#38c0f7"/>
+      <stop offset="0.68" stop-color="#1a5ed6"/>
+      <stop offset="1" stop-color="#081c6e"/>
+    </radialGradient>
+    <linearGradient id="irisTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#04123a" stop-opacity="0.9"/>
+      <stop offset="0.45" stop-color="#0a2a6e" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#0a2a6e" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="pupil" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#03102c"/>
+      <stop offset="0.72" stop-color="#05174a"/>
+      <stop offset="1" stop-color="#0a2a6e" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="eye">
+      <path d="M56,264 C110,196 200,176 256,176 C312,176 348,187 366,200
+               C320,262 272,300 204,300 C140,300 92,290 56,264 Z"/>
+    </clipPath>
+    <clipPath id="irisClip"><circle cx="206" cy="226" r="98"/></clipPath>
+    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="striae"><feGaussianBlur stdDeviation="1.1"/></filter>
+    <filter id="glowS" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <!-- Skin -->
+  <rect width="400" height="400" fill="url(#skin)"/>
+  <ellipse cx="110" cy="110" rx="150" ry="110" fill="#f2c3d3" opacity="0.4" filter="url(#soft)"/>
+  <ellipse cx="340" cy="310" rx="130" ry="120" fill="#b6ccf1" opacity="0.45" filter="url(#soft)"/>
+  <!-- Upper crease shadow -->
+  <path d="M48,250 C120,168 220,150 285,158 C345,166 372,190 380,214 C360,196 300,176 250,176 C188,176 118,206 70,266 Z"
+        fill="#ab8fbb" opacity="0.55" filter="url(#soft)"/>
+
+  <!-- Eyeball -->
+  <path d="M56,264 C110,196 200,176 256,176 C312,176 348,187 366,200
+           C320,262 272,300 204,300 C140,300 92,290 56,264 Z" fill="url(#sclera)"/>
+  <ellipse cx="86" cy="266" rx="46" ry="28" fill="#e7a4bb" opacity="0.42" clip-path="url(#eye)" filter="url(#soft)"/>
+
+  <!-- Iris (shifted up: upward gaze) -->
+  <g clip-path="url(#eye)">
+    <circle cx="206" cy="226" r="98" fill="url(#iris)"/>
+    <g clip-path="url(#irisClip)">
+      <g transform="translate(206,226)" filter="url(#striae)" opacity="0.55">
+        <g stroke="#0a2f8a" stroke-width="2.4">
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(0)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(15)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(30)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(45)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(60)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(75)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(90)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(105)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(120)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(135)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(150)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(165)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(180)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(195)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(210)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(225)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(240)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(255)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(270)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(285)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(300)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(315)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(330)"/>
+          <line x1="0" y1="0" x2="0" y2="-100" transform="rotate(345)"/>
+        </g>
+        <g stroke="#a9ecff" stroke-width="1.3" opacity="0.7">
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(7)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(37)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(67)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(127)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(187)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(217)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(277)"/>
+          <line x1="0" y1="0" x2="0" y2="-98" transform="rotate(322)"/>
+        </g>
+      </g>
+      <ellipse cx="206" cy="292" rx="72" ry="38" fill="#8ff6ff" opacity="0.5" filter="url(#soft)"/>
+      <rect x="108" y="128" width="196" height="150" fill="url(#irisTop)"/>
+      <circle cx="206" cy="226" r="96" fill="none" stroke="#05173f" stroke-width="6" opacity="0.85"/>
+    </g>
+    <circle cx="206" cy="226" r="36" fill="url(#pupil)"/>
+    <circle cx="206" cy="225" r="35" fill="#040f2a"/>
+    <g filter="url(#glowS)">
+      <ellipse cx="178" cy="194" rx="15" ry="21" fill="#ffffff" opacity="0.96" transform="rotate(-16 178 194)"/>
+      <circle cx="246" cy="246" r="8.5" fill="#eafaff" opacity="0.85"/>
+      <circle cx="200" cy="270" r="4.5" fill="#ffffff"/>
+      <circle cx="252" cy="210" r="3.2" fill="#ffffff"/>
+    </g>
+    <!-- strong eyelid shadow over the iris -->
+    <path d="M56,264 C110,196 200,176 256,176 C312,176 348,187 366,200 C340,214 300,196 250,196 C190,196 120,214 70,262 Z"
+          fill="#0a1636" opacity="0.35"/>
+  </g>
+
+  <!-- Lash line (base) -->
+  <path d="M56,264 C110,196 200,176 256,176 C312,176 348,187 366,200"
+        fill="none" stroke="#5f4670" stroke-width="12" stroke-linecap="round"/>
+  <path d="M56,264 C110,196 200,176 256,176 C312,176 348,187 366,200"
+        fill="none" stroke="#2b2140" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Upper lashes: thin, numerous and chaotic -->
+  <g fill="#ffffff" stroke="#d3e1f3" stroke-width="0.5">
+    <path d="M56,264 L8,324 L62,262 Z"/>
+    <path d="M63,257 L22,302 L68,254 Z"/>
+    <path d="M71,248 L30,280 L76,246 Z"/>
+    <path d="M82,237 L42,254 L87,235 Z"/>
+    <path d="M96,225 L58,222 L100,224 Z"/>
+    <path d="M104,217 L70,196 L108,216 Z"/>
+    <path d="M114,210 L86,174 L118,209 Z"/>
+    <path d="M124,204 L100,168 L127,203 Z"/>
+    <path d="M130,199 L108,154 L134,198 Z"/>
+    <path d="M150,191 L132,146 L154,190 Z"/>
+    <path d="M172,184 L158,138 L176,184 Z"/>
+    <path d="M196,180 L188,134 L200,180 Z"/>
+    <path d="M208,179 L206,150 L211,179 Z"/>
+    <path d="M220,178 L221,132 L224,179 Z"/>
+    <path d="M244,178 L252,136 L248,179 Z"/>
+    <path d="M256,179 L266,150 L259,180 Z"/>
+    <path d="M268,180 L288,144 L272,181 Z"/>
+    <path d="M292,184 L318,156 L296,185 Z"/>
+    <path d="M304,187 L330,166 L307,188 Z"/>
+    <path d="M316,190 L346,168 L320,191 Z"/>
+    <path d="M338,196 L374,182 L342,197 Z"/>
+  </g>
+
+  <!-- Thin lower lashes at the outer corner -->
+  <g fill="#ffffff" stroke="#d3e1f3" stroke-width="0.4" opacity="0.92">
+    <path d="M68,272 L40,312 L72,271 Z"/>
+    <path d="M80,280 L54,320 L84,279 Z"/>
+    <path d="M96,287 L74,326 L100,286 Z"/>
+    <path d="M114,293 L98,328 L118,292 Z"/>
+    <path d="M132,298 L122,330 L136,297 Z"/>
+  </g>
+
+  <!-- Silver hair strands: thin, pointed and chaotic -->
+  <g fill="#c7bad6" opacity="0.45" filter="url(#soft)">
+    <path d="M28,0 L48,158 L36,0 Z"/>
+    <path d="M96,0 L114,164 L104,0 Z"/>
+    <path d="M188,0 L210,150 L200,0 Z"/>
+    <path d="M290,0 L308,152 L300,0 Z"/>
+  </g>
+  <g fill="#ffffff" stroke="#cdd9ec" stroke-width="0.6">
+    <path d="M18,0 L32,150 L26,0 Z"/>
+    <path d="M40,0 L62,192 L50,0 Z"/>
+    <path d="M66,0 L76,120 L73,0 Z"/>
+    <path d="M84,0 L112,176 L94,0 Z"/>
+    <path d="M108,0 L122,140 L117,0 Z"/>
+    <path d="M132,0 L152,196 L142,0 Z"/>
+    <path d="M160,0 L170,118 L168,0 Z"/>
+    <path d="M182,0 L208,166 L192,0 Z"/>
+    <path d="M214,0 L224,108 L222,0 Z"/>
+    <path d="M240,0 L264,150 L250,0 Z"/>
+    <path d="M280,0 L290,126 L288,0 Z"/>
+    <path d="M306,0 L324,162 L316,0 Z"/>
+    <path d="M336,0 L346,100 L344,0 Z"/>
+    <path d="M360,0 L376,140 L370,0 Z"/>
+  </g>
+
+  <!-- Subtle chromatic glitch -->
+  <g opacity="0.32" style="mix-blend-mode:screen">
+    <path d="M178,182 C168,158 158,132 152,110 C168,134 182,160 188,184 Z" fill="#ff4d7a" transform="translate(-3,1)"/>
+    <path d="M258,180 C264,154 272,128 282,108 C278,134 272,160 266,182 Z" fill="#3fe6ff" transform="translate(3,-1)"/>
+  </g>
+</svg>

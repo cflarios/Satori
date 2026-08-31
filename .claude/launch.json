@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "satori-web",
+      "runtimeExecutable": ".venv\\Scripts\\python",
+      "runtimeArgs": ["-m", "uvicorn", "server:app", "--port", "8756"],
+      "port": 8756
+    }
+  ]
+}
