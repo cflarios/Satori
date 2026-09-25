@@ -1,10 +1,19 @@
-// Frontend: webcam capture / file upload -> POST /api/solve -> render.
+// Frontend: webcam capture / network camera / file upload -> solve -> render.
+//
+// Two camera sources:
+// - webcam:  getUserMedia in the browser; the frame is captured on a canvas and
+//            uploaded to POST /api/solve.
+// - network: the server reads the RTSP stream (CAMERA_URL); the browser shows
+//            its MJPEG preview and POST /api/camera/solve captures server-side.
 
 const MAX_LONG_EDGE = 1568; // largest size Claude uses
 
 const video = document.getElementById("video");
+const netcam = document.getElementById("netcam");
 const canvas = document.getElementById("canvas");
 const cameraOff = document.getElementById("camera-off");
+const sourceSelect = document.getElementById("source");
+const networkOption = sourceSelect.querySelector('option[value="network"]');
 const btnCamera = document.getElementById("btn-camera");
 const btnCapture = document.getElementById("btn-capture");
 const fileInput = document.getElementById("file-input");
@@ -13,8 +22,11 @@ const resultsEl = document.getElementById("results");
 const answersEl = document.getElementById("answers");
 const warningsEl = document.getElementById("warnings");
 
-let stream = null;
+let stream = null;      // webcam MediaStream while on
+let netcamOn = false;   // network camera preview while on
 let busy = false;
+
+const cameraOn = () => Boolean(stream) || netcamOn;
 
 function setStatus(text, isError = false) {
   statusEl.hidden = !text;
@@ -22,16 +34,28 @@ function setStatus(text, isError = false) {
   statusEl.classList.toggle("error", isError);
 }
 
-btnCamera.addEventListener("click", async () => {
+function setCameraUi(on) {
+  cameraOff.hidden = on;
+  btnCamera.textContent = on ? "Turn off camera" : "Turn on camera";
+  btnCapture.disabled = !on || busy;
+}
+
+function stopCamera() {
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
     video.srcObject = null;
-    cameraOff.hidden = false;
-    btnCamera.textContent = "Turn on camera";
-    btnCapture.disabled = true;
-    return;
   }
+  if (netcamOn) {
+    netcamOn = false;
+    netcam.removeAttribute("src"); // closes the MJPEG connection
+    netcam.hidden = true;
+  }
+  video.hidden = false;
+  setCameraUi(false);
+}
+
+async function startWebcam() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -42,14 +66,62 @@ btnCamera.addEventListener("click", async () => {
     return;
   }
   video.srcObject = stream;
-  cameraOff.hidden = true;
-  btnCamera.textContent = "Turn off camera";
-  btnCapture.disabled = false;
+  setCameraUi(true);
   setStatus("");
+}
+
+function startNetcam() {
+  netcamOn = true;
+  video.hidden = true;
+  netcam.hidden = false;
+  // Cache-buster so re-enabling opens a fresh stream.
+  netcam.src = `/api/camera/stream?t=${Date.now()}`;
+  setCameraUi(true);
+  setStatus("Connecting to the network camera…");
+}
+
+netcam.addEventListener("load", () => {
+  if (netcamOn) setStatus("");
+});
+netcam.addEventListener("error", () => {
+  if (!netcamOn) return;
+  stopCamera();
+  setStatus("Could not open the network camera. Check the URL in Settings.", true);
 });
 
+btnCamera.addEventListener("click", () => {
+  if (cameraOn()) stopCamera();
+  else if (sourceSelect.value === "network") startNetcam();
+  else startWebcam();
+});
+
+sourceSelect.addEventListener("change", () => {
+  if (cameraOn()) stopCamera();
+});
+
+// Enable the network source only when the server has a camera URL.
+function applyCameraConfig(c) {
+  const hasUrl = Boolean(c.camera_url);
+  networkOption.disabled = !hasUrl;
+  networkOption.textContent = hasUrl ? "Network camera" : "Network camera (set it in Settings)";
+  if (!hasUrl && sourceSelect.value === "network") {
+    sourceSelect.value = "webcam";
+    if (netcamOn) stopCamera();
+  }
+}
+
+fetch("/api/config")
+  .then((r) => r.json())
+  .then(applyCameraConfig)
+  .catch(() => {});
+
 btnCapture.addEventListener("click", () => {
-  if (busy || !stream) return;
+  if (busy || !cameraOn()) return;
+  if (netcamOn) {
+    // Server grabs the newest full-resolution frame itself.
+    solve("/api/camera/solve");
+    return;
+  }
   const w = video.videoWidth;
   const h = video.videoHeight;
   if (!w || !h) {
@@ -69,19 +141,24 @@ fileInput.addEventListener("change", () => {
   fileInput.value = "";
 });
 
-async function sendImage(blob, filename) {
+function sendImage(blob, filename) {
+  const form = new FormData();
+  form.append("image", blob, filename);
+  solve("/api/solve", form);
+}
+
+// POSTs to a solve endpoint (optionally with an image form) and renders the result.
+async function solve(url, body) {
   busy = true;
   btnCapture.disabled = true;
   setStatus("Analyzing with Claude…");
   resultsEl.hidden = true;
 
-  const form = new FormData();
-  form.append("image", blob, filename);
   try {
-    const resp = await fetch("/api/solve", { method: "POST", body: form });
+    const resp = await fetch(url, { method: "POST", body });
     if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      throw new Error(body.detail || `Error ${resp.status}`);
+      const detail = await resp.json().catch(() => ({}));
+      throw new Error(detail.detail || `Error ${resp.status}`);
     }
     renderResult(await resp.json());
     setStatus("");
@@ -89,9 +166,31 @@ async function sendImage(blob, filename) {
     setStatus(`Error: ${err.message}`, true);
   } finally {
     busy = false;
-    btnCapture.disabled = !stream;
+    btnCapture.disabled = !cameraOn();
   }
 }
+
+// Remote captures (MQTT button): the server captures from the network camera
+// and pushes progress + result here, whatever source this page is using.
+const events = new EventSource("/api/events");
+events.addEventListener("message", (e) => {
+  const ev = JSON.parse(e.data);
+  if (ev.type === "capture") {
+    busy = true;
+    btnCapture.disabled = true;
+    resultsEl.hidden = true;
+    setStatus("Remote capture — analyzing with Claude…");
+  } else if (ev.type === "result") {
+    renderResult(ev.result);
+    setStatus("");
+  } else if (ev.type === "error") {
+    setStatus(`Remote capture error: ${ev.detail}`, true);
+  }
+  if (ev.type !== "capture") {
+    busy = false;
+    btnCapture.disabled = !cameraOn();
+  }
+});
 
 function renderResult(result) {
   answersEl.replaceChildren();
@@ -154,6 +253,7 @@ const cfg = {
   pass: document.getElementById("cfg-pass"),
   passHint: document.getElementById("pass-hint"),
   qos: document.getElementById("cfg-qos"),
+  cameraUrl: document.getElementById("cfg-camera-url"),
 };
 
 function setSettingsStatus(text, isError = false) {
@@ -168,6 +268,8 @@ function fillSettings(c) {
   cfg.topic.value = c.mqtt_topic || "satori/answers";
   cfg.user.value = c.mqtt_user || "";
   cfg.qos.value = c.mqtt_qos || "0";
+  cfg.cameraUrl.value = c.camera_url || "";
+  applyCameraConfig(c);
   cfg.apikey.value = "";
   cfg.pass.value = "";
   cfg.apikeyHint.textContent = c.anthropic_api_key_set
@@ -216,6 +318,7 @@ settingsForm.addEventListener("submit", async (e) => {
     mqtt_topic: cfg.topic.value.trim() || "satori/answers",
     mqtt_user: cfg.user.value.trim(),
     mqtt_qos: cfg.qos.value,
+    camera_url: cfg.cameraUrl.value.trim(),
   };
   if (cfg.apikey.value.trim()) body.anthropic_api_key = cfg.apikey.value.trim();
   if (cfg.pass.value) body.mqtt_password = cfg.pass.value;
@@ -236,6 +339,14 @@ settingsForm.addEventListener("submit", async (e) => {
     const bits = [];
     if (data.applied.anthropic) bits.push("API key");
     if (data.applied.mqtt) bits.push("MQTT");
+    if (data.applied.camera) {
+      bits.push("network camera");
+      // The server closed the old stream; reopen the preview on the new URL.
+      if (netcamOn) {
+        stopCamera();
+        if (!networkOption.disabled) startNetcam();
+      }
+    }
     setSettingsStatus(bits.length ? `Saved and applied: ${bits.join(", ")}.` : "Saved.");
   } catch (err) {
     setSettingsStatus(`Error: ${err.message}`, true);

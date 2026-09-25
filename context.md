@@ -38,8 +38,10 @@ camera/browser ──image──> QuizSolver.solve() ──> Claude (vision, JSO
 - **`satori/models.py`** — `Answer` / `QuizResult` (Pydantic). `confidence` is a
   `Literal["high","medium","low"]`; this enum is mirrored in the solver's schema,
   the web badge CSS classes, and the MQTT payload.
-- **`satori/camera.py`** — OpenCV webcam wrapper, Laplacian-variance sharpness
-  metric, JPEG encode with downscale to 1568 px. Desktop-only.
+- **`satori/camera.py`** — OpenCV webcam wrapper (`Camera`), network stream reader
+  (`NetworkCamera`: RTSP/HTTP on a background thread, keeps only the newest frame,
+  auto-reconnects), `open_camera()` picks one from an index or URL,
+  Laplacian-variance sharpness metric, JPEG encode with downscale to 1568 px.
 - **`satori/publisher.py`** — optional MQTT publisher (`paho-mqtt`). `from_env()`
   returns `None` when `MQTT_BROKER` is unset, so MQTT is fully optional.
 - **`app.py`** — desktop UI loop; analysis runs on a worker thread so the video
@@ -48,6 +50,13 @@ camera/browser ──image──> QuizSolver.solve() ──> Claude (vision, JSO
   on `satori/capture`. Press `S` for the settings dialog.
 - **`server.py`** — FastAPI: `POST /api/solve` (multipart image) runs the solver in
   a threadpool; static files served at `/`. MQTT connect/disconnect via `lifespan`.
+  Network camera (`CAMERA_URL`): `GET /api/camera/stream` (MJPEG preview, 960 px,
+  ~12 fps) and `POST /api/camera/solve` (captures the newest full-res frame
+  server-side). The reader starts lazily on first use and restarts when the URL
+  changes in Settings. Also subscribes to `satori/capture`: remote captures use
+  the network camera and are pushed to open pages via `GET /api/events` (SSE).
+- **`satori/publisher.py`** also holds `CaptureCommand` (parses the optional
+  `reply_to`/`seq`/`action` JSON of a capture command) and `MqttPublisher.ack()`.
 - **`static/`** — `index.html`, `app.js`, `style.css`, `logo.svg` (favicon + header).
 
 ## Key decisions & rationale
@@ -64,6 +73,14 @@ camera/browser ──image──> QuizSolver.solve() ──> Claude (vision, JSO
   and keeps a future refactor localized.
 - **MQTT is optional and retained** — `retain=True` so a late-connecting ESP32 still
   gets the last answer. It never blocks or breaks the solve path.
+- **Network camera read by the server, not the browser** — browsers can't play
+  RTSP, and reading it server-side avoids an extra relay (go2rtc/OBS), gives a
+  full-resolution capture instead of a preview frame, and works from any device
+  on the LAN. The webcam path still captures in the browser.
+- **Remote capture acks after solving, not on receipt** — the button's LED stays
+  blue while Claude works and turns green/red on the real outcome. The ack goes to
+  the `reply_to` the device sends, so Satori doesn't hard-code device topics.
+  MQTT connects asynchronously so a broker that boots later (the ESP32) is picked up.
 - **Credentials** via `.env` (git-ignored) or environment/`ant` profile. Never commit
   keys; prefer keys with an expiration date.
 
@@ -78,8 +95,10 @@ camera/browser ──image──> QuizSolver.solve() ──> Claude (vision, JSO
 ## Current status
 
 - Desktop and web frontends: working and tested end-to-end.
-- MQTT publishing: implemented and unit-verified (payload shape), not yet tested
-  against a live broker + device.
+- MQTT publishing: implemented and unit-verified (payload shape).
+- Network camera (V380 over RTSP) and remote capture from the satori-button
+  (M5 Atom Lite) through the ESP32 broker: tested end-to-end, button → capture →
+  Claude → ack on the LED + answers in the web page.
 - Logo: `static/logo.svg` — enso + camera aperture + insight spark ("camera" logo).
   `static/eye.svg` is an unused alternate illustration kept for reference.
 

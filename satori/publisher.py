@@ -19,11 +19,49 @@ import json
 import os
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Optional
 
 import paho.mqtt.client as mqtt
 
 from .models import QuizResult
+
+DEFAULT_CAPTURE_TOPIC = "satori/capture"
+
+
+@dataclass
+class CaptureCommand:
+    """A remote capture request received on the capture topic.
+
+    The payload may be anything (the basic contract: any message = one capture).
+    Devices that want confirmation send JSON with `reply_to` and `seq`; Satori
+    then answers on `reply_to` with {"seq": N, "ok": bool, "detail": "..."} once
+    the capture has been solved (or failed). A JSON `action` other than "click"
+    (e.g. a button's double/long press) does not trigger a capture.
+    """
+
+    reply_to: Optional[str] = None
+    seq: Optional[int] = None
+    action: Optional[str] = None
+
+    @classmethod
+    def parse(cls, payload: bytes) -> "CaptureCommand":
+        try:
+            data = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            return cls()
+        if not isinstance(data, dict):
+            return cls()
+        seq = data.get("seq")
+        return cls(
+            reply_to=data.get("reply_to") or None,
+            seq=seq if isinstance(seq, int) else None,
+            action=data.get("action"),
+        )
+
+    @property
+    def triggers_capture(self) -> bool:
+        return self.action in (None, "click")
 
 
 class MqttPublisher:
@@ -77,14 +115,19 @@ class MqttPublisher:
         )
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        if reason_code.is_failure:
+            print(f"MQTT: broker {self.broker}:{self.port} refused the connection "
+                  f"({reason_code}).")
+            return
+        print(f"MQTT: connected to {self.broker}:{self.port}")
         # (Re)subscribe on connect so subscriptions survive reconnects.
         for topic in self._subs:
             client.subscribe(topic, qos=self.qos)
 
     def _on_message(self, client, userdata, msg):
-        cb = self._subs.get(msg.topic)
-        if cb is None and self._subs:
-            cb = next(iter(self._subs.values()))  # single-topic fallback
+        # Subscriptions may use wildcards (e.g. "satori/+/event").
+        cb = next((c for t, c in self._subs.items()
+                   if mqtt.topic_matches_sub(t, msg.topic)), None)
         if cb:
             try:
                 cb(msg.topic, msg.payload)
@@ -98,7 +141,9 @@ class MqttPublisher:
             self.client.subscribe(topic, qos=self.qos)
 
     def connect(self) -> None:
-        self.client.connect(self.broker, self.port, keepalive=60)
+        # Async: if the broker (e.g. the ESP32) is off, paho keeps retrying in the
+        # background and subscribes once it comes up, instead of failing for good.
+        self.client.connect_async(self.broker, self.port, keepalive=60)
         self.client.loop_start()
 
     def disconnect(self) -> None:
@@ -125,3 +170,10 @@ class MqttPublisher:
             self.topic, self._payload(result), qos=self.qos, retain=self.retain
         )
         return info.rc == mqtt.MQTT_ERR_SUCCESS
+
+    def ack(self, cmd: CaptureCommand, ok: bool, detail: str = "") -> None:
+        """Confirm a capture command to the device that sent it (if it asked)."""
+        if not cmd.reply_to:
+            return
+        payload = {"seq": cmd.seq, "ok": ok, "detail": detail[:80]}
+        self.client.publish(cmd.reply_to, json.dumps(payload), qos=1, retain=False)

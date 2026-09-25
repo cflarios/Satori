@@ -3,6 +3,8 @@
 Usage:
     python app.py                  # camera 0
     python app.py --camera 1       # another camera
+    python app.py --camera rtsp://192.168.1.9:554/live/ch00_0  # network camera
+    python app.py --camera net     # network camera from CAMERA_URL in .env
     python app.py --file photo.jpg # test without a camera, using an existing image
 """
 
@@ -18,14 +20,14 @@ from pathlib import Path
 import cv2
 from dotenv import load_dotenv
 
-from satori import MqttPublisher, QuizSolver, QuizSolverError, QuizResult
+from satori import (DEFAULT_CAPTURE_TOPIC, CaptureCommand, MqttPublisher, QuizSolver,
+                    QuizSolverError, QuizResult)
 from satori import config
 from satori.camera import (
-    Camera, SHARPNESS_THRESHOLD, STABILITY_THRESHOLD, MOTION_THRESHOLD,
-    encode_jpeg, frame_change, sharpness, small_gray,
+    SHARPNESS_THRESHOLD, STABILITY_THRESHOLD, MOTION_THRESHOLD,
+    encode_jpeg, frame_change, open_camera, sharpness, small_gray,
 )
 
-DEFAULT_CAPTURE_TOPIC = "satori/capture"
 AUTO_HOLD_SECONDS = 1.0   # how long the scene must hold still to auto-capture
 AUTO_COOLDOWN = 3.0       # min seconds between auto-captures
 
@@ -69,9 +71,9 @@ def solve_file(solver: QuizSolver, path: Path) -> int:
 
 
 class DesktopApp:
-    def __init__(self, camera_index: int):
+    def __init__(self, camera_source):
         self.solver = QuizSolver()
-        self.camera = Camera(camera_index)
+        self.camera = open_camera(camera_source)
         self.busy = False
         self.status = "SPACE capture | A auto | S settings | Q quit"
         self.auto = True                # auto-capture on stability, on by default
@@ -79,7 +81,7 @@ class DesktopApp:
         self._stable_since = None       # when the scene started holding still
         self._armed = True              # ready to auto-capture (re-armed on motion)
         self._last_capture = 0.0        # timestamp of the last capture
-        self._capture_requested = False  # set by the MQTT command handler
+        self._capture_requested = None  # CaptureCommand set by the MQTT handler
         self.mqtt = None
         self._setup_mqtt()
 
@@ -94,9 +96,9 @@ class DesktopApp:
         self.mqtt = MqttPublisher.from_env()
         if self.mqtt:
             try:
-                self.mqtt.connect()
                 topic = os.environ.get("MQTT_CAPTURE_TOPIC", DEFAULT_CAPTURE_TOPIC)
                 self.mqtt.subscribe(topic, self._on_capture_command)
+                self.mqtt.connect()
                 print(f"MQTT: publishing to {self.mqtt.broker}:{self.mqtt.port} "
                       f"topic '{self.mqtt.topic}'; listening for captures on '{topic}'")
             except Exception as exc:
@@ -107,17 +109,26 @@ class DesktopApp:
     def _on_capture_command(self, topic: str, payload: bytes) -> None:
         # Runs on the MQTT network thread; just flag it and let the main loop
         # capture the current frame (thread-safe, no OpenCV calls off-thread).
+        cmd = CaptureCommand.parse(payload)
+        if not cmd.triggers_capture:
+            self.mqtt.ack(cmd, False, f"action '{cmd.action}' is not mapped")
+            return
         print(f"MQTT: capture command received on '{topic}'.")
-        self._capture_requested = True
+        self._capture_requested = cmd
 
-    def _trigger_capture(self, frame, reason: str) -> None:
+    def _trigger_capture(self, frame, reason: str, cmd=None) -> None:
         self.busy = True
         self._armed = False
         self._stable_since = None
         self._last_capture = time.time()
         print(f"Capturing ({reason})...")
         image_bytes = encode_jpeg(frame)
-        threading.Thread(target=self._analyze, args=(image_bytes,), daemon=True).start()
+        threading.Thread(target=self._analyze, args=(image_bytes, cmd), daemon=True).start()
+
+    def _ack(self, cmd, ok: bool, detail: str) -> None:
+        """Confirm a remote capture to the device that asked for it."""
+        if cmd is not None and self.mqtt:
+            self.mqtt.ack(cmd, ok, detail)
 
     def open_settings(self) -> None:
         """Open the modal settings dialog and apply any changes live."""
@@ -134,16 +145,19 @@ class DesktopApp:
                                        ("MQTT", changed["mqtt"])) if ok]
         self.status = "Saved: " + ", ".join(parts) if parts else "Settings saved"
 
-    def _analyze(self, image_bytes: bytes) -> None:
+    def _analyze(self, image_bytes: bytes, cmd=None) -> None:
         try:
             result = self.solver.solve(image_bytes)
         except QuizSolverError as exc:
             print(f"\nError: {exc}", file=sys.stderr)
             self.status = "Error - see console"
+            self._ack(cmd, False, str(exc))
         except Exception as exc:  # network / API errors
             print(f"\nUnexpected error: {exc}", file=sys.stderr)
             self.status = "Error - see console"
+            self._ack(cmd, False, type(exc).__name__)
         else:
+            self._ack(cmd, True, f"{len(result.answers)} answers")
             print_result(result)
             saved = save_capture(image_bytes, result)
             print(f"Capture and answers saved to {saved.parent}")
@@ -226,8 +240,8 @@ class DesktopApp:
 
                 # Remote capture command (MQTT) — flagged from the network thread.
                 if self._capture_requested and not self.busy:
-                    self._capture_requested = False
-                    self._trigger_capture(frame, "MQTT command")
+                    cmd, self._capture_requested = self._capture_requested, None
+                    self._trigger_capture(frame, "MQTT command", cmd)
 
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), ord("Q"), 27):
@@ -353,13 +367,26 @@ def main() -> int:
         )
 
     parser = argparse.ArgumentParser(description="Solve quizzes seen through the webcam with Claude.")
-    parser.add_argument("--camera", type=int, default=0, help="Camera index (default: 0)")
+    parser.add_argument("--camera", default="0",
+                        help="Webcam index, a stream URL (rtsp://...), or 'net' to use "
+                             "CAMERA_URL from .env (default: 0)")
     parser.add_argument("--file", type=Path, help="Analyze an existing image instead of using the camera")
     args = parser.parse_args()
 
     if args.file:
         return solve_file(QuizSolver(), args.file)
-    return DesktopApp(args.camera).run()
+    source = args.camera
+    if source == "net":
+        source = os.environ.get("CAMERA_URL", "")
+        if not source:
+            print("Error: --camera net needs CAMERA_URL in .env.", file=sys.stderr)
+            return 1
+    try:
+        app = DesktopApp(source)
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    return app.run()
 
 
 if __name__ == "__main__":

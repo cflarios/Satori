@@ -1,14 +1,22 @@
-"""Webcam capture with OpenCV: open, measure sharpness and encode JPEG.
+"""Camera capture with OpenCV: open, measure sharpness and encode JPEG.
 
-Only the desktop app uses this module; the web version captures in the browser
-and simply does not import this file.
+`Camera` wraps a local webcam (desktop app). `NetworkCamera` reads an RTSP/HTTP
+stream (e.g. a Wi-Fi IP camera) and is used by both the desktop app and the web
+server; with a local webcam the web version captures in the browser instead.
 """
 
+import os
 import sys
-from typing import Optional
+import threading
+import time
+from typing import Optional, Union
 
-import cv2
-import numpy as np
+# RTSP over TCP: UDP drops packets on Wi-Fi and shows up as smeared frames.
+# Must be set before the first VideoCapture opens a stream.
+os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
+
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
 
 # Claude downscales images to ~1568 px on the long edge; sending more does not help.
 MAX_LONG_EDGE = 1568
@@ -41,6 +49,88 @@ class Camera:
 
     def release(self) -> None:
         self.cap.release()
+
+
+class NetworkCamera:
+    """Network stream (RTSP/HTTP) read on a background thread.
+
+    OpenCV buffers network streams, so a reader that falls behind shows frames
+    seconds old. The thread drains the stream continuously and keeps only the
+    latest frame. Reconnects on its own if the camera drops off the Wi-Fi.
+
+    - `read()` waits for the next new frame, like a webcam (desktop loop).
+    - `latest()` returns the newest frame immediately (web snapshot/preview).
+    """
+
+    RECONNECT_DELAY = 2.0
+
+    def __init__(self, url: str):
+        self.url = url
+        self._frame: Optional[np.ndarray] = None
+        self._frame_time = 0.0
+        self._seq = 0        # increments on every new frame
+        self._read_seq = 0   # last seq handed out by read()
+        self._cond = threading.Condition()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="netcam", daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                print(f"Network camera: could not open {self.url}; retrying...", file=sys.stderr)
+                cap.release()
+                self._stop.wait(self.RECONNECT_DELAY)
+                continue
+            while not self._stop.is_set():
+                ok, frame = cap.read()
+                if not ok:
+                    print("Network camera: stream lost; reconnecting...", file=sys.stderr)
+                    break
+                with self._cond:
+                    self._frame = frame
+                    self._frame_time = time.time()
+                    self._seq += 1
+                    self._cond.notify_all()
+            cap.release()
+            self._stop.wait(self.RECONNECT_DELAY)
+
+    def latest(self, max_age: float = 2.0) -> Optional[np.ndarray]:
+        """Newest frame, or None if there is none newer than `max_age` seconds."""
+        with self._cond:
+            if self._frame is None or time.time() - self._frame_time > max_age:
+                return None
+            return self._frame.copy()
+
+    # Long enough to ride out a reconnect (2 s delay + ~5 s to reopen RTSP).
+    def read(self, timeout: float = 15.0) -> Optional[np.ndarray]:
+        """Wait for a frame newer than the last one read; None on timeout."""
+        with self._cond:
+            if not self._cond.wait_for(lambda: self._seq > self._read_seq, timeout):
+                return None
+            self._read_seq = self._seq
+            return self._frame.copy()
+
+    def wait_first_frame(self, timeout: float = 15.0) -> bool:
+        """Block until a frame arrives (opening an RTSP stream takes a few seconds)."""
+        with self._cond:
+            return self._cond.wait_for(lambda: self._seq > 0, timeout)
+
+    def release(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+
+def open_camera(source: Union[int, str]) -> Union[Camera, NetworkCamera]:
+    """Webcam index (int or digit string) -> Camera; URL -> NetworkCamera."""
+    if isinstance(source, int) or str(source).isdigit():
+        return Camera(int(source))
+    cam = NetworkCamera(str(source))
+    if not cam.wait_first_frame():
+        cam.release()
+        raise RuntimeError(f"No image from network camera {source} (is it on the network?).")
+    return cam
 
 
 def sharpness(frame: np.ndarray) -> float:
