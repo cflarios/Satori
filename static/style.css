@@ -113,7 +113,18 @@ header p { margin: 8px 0 20px; color: var(--muted); }
   overflow: hidden;
 }
 
-video { width: 100%; height: 100%; object-fit: contain; }
+video, #netcam { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Their display rules would otherwise override the hidden attribute. */
+#netcam[hidden], video[hidden], .camera-off[hidden] { display: none; }
+
+#source {
+  font: inherit;
+  padding: 9px 10px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 
 .camera-off {
   position: absolute;

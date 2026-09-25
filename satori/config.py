@@ -48,6 +48,7 @@ def public_config() -> dict:
         "mqtt_user": _get("MQTT_USER"),
         "mqtt_qos": _get("MQTT_QOS", "0"),
         "mqtt_password_set": _is_set("MQTT_PASSWORD"),
+        "camera_url": _get("CAMERA_URL"),
     }
 
 
@@ -73,7 +74,15 @@ def update_config(updates: dict) -> Dict[str, bool]:
 
     Returns which subsystems changed so the caller can rebuild them.
     """
-    changed = {"anthropic": False, "mqtt": False}
+    changed = {"anthropic": False, "mqtt": False, "camera": False}
+
+    # The form always sends the URL; only flag a change so the stream isn't
+    # restarted on every unrelated save.
+    if "camera_url" in updates:
+        url = (updates["camera_url"] or "").strip()
+        if url != _get("CAMERA_URL"):
+            _write("CAMERA_URL", url)
+            changed["camera"] = True
 
     if updates.get("anthropic_api_key", "").strip():
         _write("ANTHROPIC_API_KEY", updates["anthropic_api_key"].strip())

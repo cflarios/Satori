@@ -44,6 +44,14 @@
           <p class="hint" id="apikey-hint"></p>
         </fieldset>
         <fieldset>
+          <legend>Network camera (optional)</legend>
+          <label>Stream URL
+            <input id="cfg-camera-url" autocomplete="off" placeholder="rtsp://192.168.1.9:554/live/ch00_0">
+          </label>
+          <p class="hint">RTSP/HTTP stream of a Wi-Fi camera. The server reads it, so it
+            works from any device on the network. Empty = disabled.</p>
+        </fieldset>
+        <fieldset>
           <legend>MQTT — send answers to an ESP32 (optional)</legend>
           <label>Broker host
             <input id="cfg-broker" autocomplete="off" placeholder="192.168.1.21 (empty = disabled)">
@@ -69,9 +77,14 @@
     <section class="camera-panel">
       <div class="video-wrap">
         <video id="video" autoplay playsinline muted></video>
+        <img id="netcam" alt="Network camera preview" hidden>
         <div id="camera-off" class="camera-off">Camera off</div>
       </div>
       <div class="controls">
+        <select id="source" aria-label="Camera source">
+          <option value="webcam">This device's webcam</option>
+          <option value="network" disabled>Network camera (set it in Settings)</option>
+        </select>
         <button id="btn-camera" type="button">Turn on camera</button>
         <button id="btn-capture" type="button" disabled>Capture and solve</button>
         <label class="upload-label">
